@@ -9,12 +9,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { ArrowUpRight } from 'lucide-react';
 import { PageContainer } from '@/components/page-container';
+import { Pagination } from '@/components/pagination';
 import { RefundPanel } from '@/components/refund-panel';
 import { CopyButton } from '@/components/copy-button';
 import { useOnline } from '@/components/network-status';
-import { describeFailure, isAbortError } from '@/lib/network-status';
+import { describeFailure } from '@/lib/network-status';
 import type { Role } from '@/lib/rbac';
-import { explorerTxUrl } from '@/lib/explorer';
+import { formatTimestamp, toISO8601 } from '@/lib/format-timestamp';
 import { focusRestorer, getFocusable, wrapTabTarget } from '@/lib/dialog-focus';
 
 interface Payment {
@@ -143,7 +144,6 @@ export function Dashboard() {
   // when the session is known to be a viewer. The server routes enforce the
   // same boundary; hiding UI here is a convenience, not the control.
   const [role, setRole] = useState<Role | null>(null);
-  const [refunded, setRefunded] = useState<ReadonlySet<string>>(() => new Set());
   const markRefunded = useCallback(
     (txHash: string) =>
       setRefunded((prev) => {
@@ -154,7 +154,6 @@ export function Dashboard() {
     [],
   );
   const online = useOnline();
-  const visible = useVisibility();
 
   useEffect(() => {
     let live = true;
@@ -174,49 +173,6 @@ export function Dashboard() {
 
   // Viewers can inspect payments and revenue but cannot initiate refunds.
   const canRefund = role !== 'viewer';
-
-  // The current page lives in the URL (?page=2) so it survives reloads and can
-  // be linked to; searchParams is the single source of truth, and `goToPage`
-  // writes a new URL that the router re-renders this component with.
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const pageParam = Number(searchParams.get('page') ?? '1');
-  const page = Number.isInteger(pageParam) && pageParam >= 1 ? pageParam : 1;
-
-  const goToPage = useCallback(
-    (next: number) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (next <= 1) params.delete('page');
-      else params.set('page', String(next));
-      router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`, {
-        scroll: false,
-      });
-    },
-    [router, pathname, searchParams],
-  );
-
-  // SWR caches each ?page=N response keyed by URL, so paging back to a visited
-  // page is instant. The 15s poll keeps only the visible page fresh, and the
-  // `online` gate means a disconnected browser stops requesting (every request
-  // would fail and replace a good table with an error); reconnecting turns the
-  // key back on, which refetches immediately rather than waiting out a tick.
-  const { data, error, mutate } = useSWR<PaymentsResponse>(
-    online ? paymentsUrl(page) : null,
-    fetchPaymentsPage,
-    { refreshInterval: POLL_INTERVAL_MS, keepPreviousData: true },
-  );
-
-  // Refresh on demand (retry, or after a manual sync).
-  const reload = useCallback(() => {
-    void mutate();
-  }, [mutate]);
-
-  const state: LoadState = error
-    ? { status: 'error', message: describeFailure(error, navigator.onLine) }
-    : !data
-      ? { status: 'loading' }
-      : { status: 'ready', payments: data.payments, sync: data.sync ?? null };
 
   // The current page lives in the URL (?page=2) so it survives reloads and can
   // be linked to; searchParams is the single source of truth, and `goToPage`
@@ -319,7 +275,7 @@ export function Dashboard() {
             </span>
             <span className="text-4xl sm:text-5xl font-black tracking-tighter mt-4 flex items-baseline gap-2 text-slate-900 dark:text-white transition-colors duration-300">
               {state.status === 'loading' ? (
-                <span className="block h-10 sm:h-12 w-44 sm:w-56 bg-slate-200/80 dark:bg-white/10 animate-pulse" />
+                <span className="block h-10 sm:h-12 w-44 sm:w-56 bg-slate-200 dark:bg-white/10 animate-pulse" />
               ) : (
                 <>
                   {formatAmount(total)}

@@ -13,7 +13,7 @@ export const PBKDF2_ITERATIONS = 310_000;
 /** AES-GCM recommended nonce length in bytes. */
 const IV_LENGTH = 12;
 
-export function randomBytes(length: number): Uint8Array {
+export function randomBytes(length: number): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(length);
   crypto.getRandomValues(bytes);
   return bytes;
@@ -25,7 +25,7 @@ export function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-export function fromBase64(value: string): Uint8Array {
+export function fromBase64(value: string): Uint8Array<ArrayBuffer> {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -41,7 +41,7 @@ export function fromBase64(value: string): Uint8Array {
  */
 export async function deriveKey(
   walletAddress: string,
-  salt: Uint8Array,
+  salt: Uint8Array<ArrayBuffer>,
   iterations: number = PBKDF2_ITERATIONS,
 ): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey(
@@ -67,10 +67,7 @@ export interface EncryptedPayload {
   iv: string;
 }
 
-export async function encryptPayload(
-  key: CryptoKey,
-  plaintext: string,
-): Promise<EncryptedPayload> {
+export async function encryptPayload(key: CryptoKey, plaintext: string): Promise<EncryptedPayload> {
   const iv = randomBytes(IV_LENGTH);
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
@@ -80,10 +77,7 @@ export async function encryptPayload(
   return { ciphertext: toBase64(new Uint8Array(ciphertext)), iv: toBase64(iv) };
 }
 
-export async function decryptPayload(
-  key: CryptoKey,
-  payload: EncryptedPayload,
-): Promise<string> {
+export async function decryptPayload(key: CryptoKey, payload: EncryptedPayload): Promise<string> {
   const plaintext = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: fromBase64(payload.iv) },
     key,

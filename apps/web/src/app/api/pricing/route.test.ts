@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { POST } from './route';
 
 const mockRequest = (url: string, body: unknown, headers: Record<string, string> = {}) =>
@@ -18,7 +18,9 @@ describe('POST /api/pricing (edge) (#168)', () => {
       mockRequest('http://localhost/api/pricing', {
         base: '100',
         merchant: 'GAAA',
-        rules: { rules: [{ name: 'm', priority: 0, effect: { kind: 'markup_pct', percent: '5' } }] },
+        rules: {
+          rules: [{ name: 'm', priority: 0, effect: { kind: 'markup_pct', percent: '5' } }],
+        },
       }),
     );
     expect(res.status).toBe(200);
@@ -34,7 +36,14 @@ describe('POST /api/pricing (edge) (#168)', () => {
           base: '100',
           merchant: 'GAAA',
           rules: {
-            rules: [{ name: 'eu', priority: 0, match: { geo: 'eu' }, effect: { kind: 'markup_pct', percent: '20' } }],
+            rules: [
+              {
+                name: 'eu',
+                priority: 0,
+                match: { geo: 'eu' },
+                effect: { kind: 'markup_pct', percent: '20' },
+              },
+            ],
           },
         },
         { 'cf-ipcountry': 'DE' },
@@ -46,7 +55,9 @@ describe('POST /api/pricing (edge) (#168)', () => {
   });
 
   it('rejects a non-decimal base', async () => {
-    const res = await POST(mockRequest('http://localhost/api/pricing', { base: 'abc', merchant: 'GAAA' }));
+    const res = await POST(
+      mockRequest('http://localhost/api/pricing', { base: 'abc', merchant: 'GAAA' }),
+    );
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toBe('base must be a decimal string');
@@ -60,7 +71,9 @@ describe('POST /api/pricing (edge) (#168)', () => {
   });
 
   it('returns cache headers for edge caching', async () => {
-    const res = await POST(mockRequest('http://localhost/api/pricing', { base: '10', merchant: 'GAAA' }));
+    const res = await POST(
+      mockRequest('http://localhost/api/pricing', { base: '10', merchant: 'GAAA' }),
+    );
     expect(res.headers.get('Cache-Control')).toContain('s-maxage');
   });
 });

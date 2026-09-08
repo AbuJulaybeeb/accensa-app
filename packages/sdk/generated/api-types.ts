@@ -39,6 +39,22 @@ export interface paths {
     /**
      * Cursor-paginated payment history.
      * @description Session-authenticated; see apps/web/src/middleware.ts.
+     *
+     *     Filters narrow the result set server-side before pagination, so the
+     *     cursor stays correct under every combination: rows are neither skipped
+     *     nor repeated when walking every page of a filtered result. Unknown
+     *     parameters are rejected with a 400 rather than silently ignored.
+     *
+     *     - `limit` — page size (1–1000, default 100). Works with `page` or
+     *       `cursor`, not both.
+     *     - `page` — 1-based offset page. Mutually exclusive with `cursor`.
+     *     - `cursor` — opaque keyset cursor returned as `next_cursor`.
+     *     - `route` — exact match on the attributed HTTP path (e.g. `/api/v1/pay`).
+     *       See /api/routes for the *aggregate* revenue by route; this returns
+     *       the individual payments behind one route.
+     *     - `payer` — exact match on the Stellar payer address.
+     *     - `asset` — exact match on the settlement asset contract id.
+     *     - `date_from` / `date_to` — ISO-8601 range on `ts` (inclusive).
      */
     get: operations['listPayments'];
     put?: never;
@@ -163,6 +179,21 @@ export interface components {
       payments: components['schemas']['PaymentRow'][];
       sync: components['schemas']['SyncState'] | null;
       next_cursor?: string | null;
+      total?: number;
+      total_amount?: string;
+      total_asset?: string | null;
+      total_pages?: number;
+      total_count?: number;
+      /** @description Echoes the active filters, present only when at least one is set. */
+      filter_info?: {
+        route?: string;
+        payer?: string;
+        asset?: string;
+        /** Format: date-time */
+        date_from?: string;
+        /** Format: date-time */
+        date_to?: string;
+      };
     };
     RouteRevenue: {
       route: string;
@@ -279,7 +310,13 @@ export interface operations {
     parameters: {
       query?: {
         limit?: number;
+        page?: number;
         cursor?: string;
+        route?: string;
+        payer?: string;
+        asset?: string;
+        date_from?: string;
+        date_to?: string;
       };
       header?: never;
       path?: never;
@@ -294,6 +331,15 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PaymentsResponse'];
+        };
+      };
+      /** @description Invalid, unknown, or contradictory parameters. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
         };
       };
       /** @description Unauthorized. */

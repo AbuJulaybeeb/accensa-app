@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { price, type PricingRules, type PricingContext, type GeoRegion } from '@/lib/pricing/engine';
+import {
+  price,
+  type PricingRules,
+  type PricingContext,
+  type GeoRegion,
+} from '@/lib/pricing/engine';
 
 /**
  * Edge-computed dynamic pricing (#168).
@@ -24,13 +29,54 @@ export const dynamic = 'force-dynamic';
 /** Coarse region classifier the edge can compute with zero I/O. */
 function geoFromHeader(headers: Headers): GeoRegion {
   // Cloudflare: cf-ipcountry. Vercel: a similar value in x-vercel-ip-country.
-  const country = (headers.get('cf-ipcountry') ?? headers.get('x-vercel-ip-country') ?? '')
-    .toUpperCase();
+  const country = (
+    headers.get('cf-ipcountry') ??
+    headers.get('x-vercel-ip-country') ??
+    ''
+  ).toUpperCase();
   if (!country) return 'auto';
   if (country === 'US' || country === 'CA' || country === 'MX') return 'na';
-  if (['GB', 'DE', 'FR', 'NL', 'ES', 'IT', 'PT', 'IE', 'SE', 'NO', 'DK', 'FI', 'PL', 'CH', 'AT', 'BE', 'LU', 'CZ', 'RO', 'HU', 'BG', 'GR', 'HR', 'EE', 'LT', 'LV', 'SK', 'SI', 'CY', 'MT'].includes(country)) return 'eu';
-  if (['IN', 'JP', 'KR', 'SG', 'MY', 'TH', 'VN', 'ID', 'PH', 'HK', 'TW', 'AU', 'NZ'].includes(country)) return 'apac';
-  if (['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'UY', 'PY', 'BO', 'EC'].includes(country)) return 'latam';
+  if (
+    [
+      'GB',
+      'DE',
+      'FR',
+      'NL',
+      'ES',
+      'IT',
+      'PT',
+      'IE',
+      'SE',
+      'NO',
+      'DK',
+      'FI',
+      'PL',
+      'CH',
+      'AT',
+      'BE',
+      'LU',
+      'CZ',
+      'RO',
+      'HU',
+      'BG',
+      'GR',
+      'HR',
+      'EE',
+      'LT',
+      'LV',
+      'SK',
+      'SI',
+      'CY',
+      'MT',
+    ].includes(country)
+  )
+    return 'eu';
+  if (
+    ['IN', 'JP', 'KR', 'SG', 'MY', 'TH', 'VN', 'ID', 'PH', 'HK', 'TW', 'AU', 'NZ'].includes(country)
+  )
+    return 'apac';
+  if (['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'UY', 'PY', 'BO', 'EC'].includes(country))
+    return 'latam';
   if (['ZA', 'NG', 'KE', 'EG', 'GH', 'MA', 'TN', 'ET'].includes(country)) return 'africa';
   return 'other';
 }
@@ -81,11 +127,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  return NextResponse.json({ merchant, prices: result, region: ctx.geo }, {
-    headers: {
-      // Cacheable at the edge: identical input is a pure function — but only
-      // if the caller sends a stable `id` query param to key replay on.
-      'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=300',
+  return NextResponse.json(
+    { merchant, prices: result, region: ctx.geo },
+    {
+      headers: {
+        // Cacheable at the edge: identical input is a pure function — but only
+        // if the caller sends a stable `id` query param to key replay on.
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=300',
+      },
     },
-  });
+  );
 }

@@ -56,9 +56,6 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const profile = await withMerchantClient(caller.id, (client) =>
-    updateMerchantProfile(client, caller.id, parsed.update),
-  );
   const profile = await withMerchantClient(caller.id, async (client) => {
     const updated = await updateMerchantProfile(client, caller.id, parsed.update);
 

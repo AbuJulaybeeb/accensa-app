@@ -34,6 +34,14 @@ export interface PaymentsResponse {
   total_pages: number;
   /** Total count of all settled payments for this merchant. */
   total_count?: number;
+  /** Echoes the filters applied to this query (#167). */
+  filter_info?: {
+    route?: string;
+    payer?: string;
+    asset?: string;
+    date_from?: string;
+    date_to?: string;
+  };
 }
 
 export async function GET(request: Request) {
@@ -88,23 +96,48 @@ export async function GET(request: Request) {
     }
   }
 
-  // Date range filter (#142): ?from=ISO-8601&to=ISO-8601
-  const fromParam = searchParams.get('from');
-  const toParam = searchParams.get('to');
-  let fromDate: Date | null = null;
-  let toDate: Date | null = null;
-
-  if (fromParam) {
-    fromDate = new Date(fromParam);
-    if (Number.isNaN(fromDate.getTime())) {
-      return NextResponse.json({ error: 'from must be a valid ISO-8601 date' }, { status: 400 });
+  // Unknown query parameters are rejected rather than silently ignored, so a
+  // typo in a dashboard or SDK filter surfaces as a 400 instead of an
+  // unfiltered response that looks correct (#167).
+  const ALLOWED_PARAMS = new Set([
+    'limit',
+    'page',
+    'cursor',
+    'route',
+    'payer',
+    'asset',
+    'date_from',
+    'date_to',
+  ]);
+  for (const key of searchParams.keys()) {
+    if (!ALLOWED_PARAMS.has(key)) {
+      return NextResponse.json({ error: `unknown parameter: ${key}` }, { status: 400 });
     }
   }
-  if (toParam) {
-    toDate = new Date(toParam);
-    if (Number.isNaN(toDate.getTime())) {
-      return NextResponse.json({ error: 'to must be a valid ISO-8601 date' }, { status: 400 });
+
+  // Filter parameters (#167): ?route=&payer=&asset=&date_from=&date_to=
+  const filterRoute = searchParams.get('route');
+  const filterPayer = searchParams.get('payer');
+  const filterAsset = searchParams.get('asset');
+  const filterDateFrom = searchParams.get('date_from');
+  const filterDateTo = searchParams.get('date_to');
+
+  let fromDate: Date | null = null;
+  let toDate: Date | null = null;
+  if (filterDateFrom) {
+    fromDate = new Date(filterDateFrom);
+    if (Number.isNaN(fromDate.getTime())) {
+      return NextResponse.json({ error: 'date_from must be a valid date' }, { status: 400 });
     }
+  }
+  if (filterDateTo) {
+    toDate = new Date(filterDateTo);
+    if (Number.isNaN(toDate.getTime())) {
+      return NextResponse.json({ error: 'date_to must be a valid date' }, { status: 400 });
+    }
+  }
+  if (fromDate && toDate && fromDate.getTime() > toDate.getTime()) {
+    return NextResponse.json({ error: 'date_from must be on or before date_to' }, { status: 400 });
   }
 
   const offset = (page - 1) * limit;
@@ -120,6 +153,32 @@ export async function GET(request: Request) {
       async (client) => {
         await ensureSchema(client);
 
+        // The same predicate list feeds the page query and the aggregate
+        // query, so the header totals always cover the filtered set (#167).
+        const predicates: string[] = [];
+        const params: (string | number)[] = [merchant.id];
+        if (filterRoute) {
+          predicates.push(`route = $${params.length + 1}`);
+          params.push(filterRoute);
+        }
+        if (filterPayer) {
+          predicates.push(`payer = $${params.length + 1}`);
+          params.push(filterPayer);
+        }
+        if (filterAsset) {
+          predicates.push(`asset = $${params.length + 1}`);
+          params.push(filterAsset);
+        }
+        if (fromDate) {
+          predicates.push(`ts >= $${params.length + 1}`);
+          params.push(fromDate.toISOString());
+        }
+        if (toDate) {
+          predicates.push(`ts <= $${params.length + 1}`);
+          params.push(toDate.toISOString());
+        }
+        const filterSql = predicates.length ? ` AND ${predicates.join(' AND ')}` : '';
+
         // Window functions evaluate over the full filtered row set before LIMIT
         // and OFFSET are applied, so one query returns both the page and the
         // aggregates the dashboard header needs (total count, sum, single-asset
@@ -130,18 +189,7 @@ export async function GET(request: Request) {
                            CASE WHEN MIN(COALESCE(asset, 'native')) OVER() =
                                      MAX(COALESCE(asset, 'native')) OVER()
                                 THEN MIN(COALESCE(asset, 'native')) OVER() END AS total_asset
-                    FROM payments WHERE merchant_id = $1 AND ts IS NOT NULL`;
-        const params: (string | number)[] = [merchant.id];
-
-        // Apply date range filter (#142)
-        if (fromDate) {
-          query += ` AND ts >= $${params.length + 1}`;
-          params.push(fromDate.toISOString());
-        }
-        if (toDate) {
-          query += ` AND ts <= $${params.length + 1}`;
-          params.push(toDate.toISOString());
-        }
+                    FROM payments WHERE merchant_id = $1 AND ts IS NOT NULL${filterSql}`;
 
         if (parsedCursor) {
           query += ` AND (ts < $${params.length + 1} OR (ts = $${params.length + 1} AND tx_hash < $${params.length + 2}))`;
@@ -157,9 +205,12 @@ export async function GET(request: Request) {
 
         const result = await client.query(query, params);
 
+        // Aggregate query covers the same filtered set; only the tenant-scope
+        // and filter prefix of params belongs here.
+        const countParams = params.slice(0, predicates.length + 1);
         const countRes = await client.query<{ total_count: string; total_amount: string | null }>(
-          `SELECT count(*)::text AS total_count, coalesce(sum(amount), 0)::text AS total_amount FROM payments WHERE merchant_id = $1 AND ts IS NOT NULL`,
-          [merchant!.id],
+          `SELECT count(*)::text AS total_count, coalesce(sum(amount), 0)::text AS total_amount FROM payments WHERE merchant_id = $1 AND ts IS NOT NULL${filterSql}`,
+          countParams,
         );
         const totalCount = countRes.rows.length
           ? Number(countRes.rows[0].total_count ?? countRes.rows.length)
@@ -173,7 +224,7 @@ export async function GET(request: Request) {
 
         return {
           rows: result.rows,
-          sync: await getSyncState(client, merchant!.id),
+          sync: await getSyncState(client, merchant.id),
           totalCount,
           totalAmount,
         };
@@ -209,6 +260,17 @@ export async function GET(request: Request) {
       total_asset: totalAsset,
       total_pages: totalPages,
       total_count: totalCount,
+      ...(filterRoute || filterPayer || filterAsset || filterDateFrom || filterDateTo
+        ? {
+            filter_info: {
+              route: filterRoute ?? undefined,
+              payer: filterPayer ?? undefined,
+              asset: filterAsset ?? undefined,
+              date_from: filterDateFrom ?? undefined,
+              date_to: filterDateTo ?? undefined,
+            },
+          }
+        : {}),
     };
     return NextResponse.json(body, {
       headers: {

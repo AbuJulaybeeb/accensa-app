@@ -393,32 +393,28 @@ describe('/api/payments GET', () => {
     test('applies filters to the aggregate query and the page query', async () => {
       const countSql: string[] = [];
       const pageSql: string[] = [];
-      const query = vi
-        .fn()
-        .mockImplementation((sql: string, params: unknown[]) => {
-          if (sql.includes('count(*)')) {
-            countSql.push(sql);
-            return Promise.resolve({
-              rows: [{ total_count: '1', total_amount: '10' }],
-            });
-          }
-          pageSql.push(sql);
-          return Promise.resolve({ rows: [] });
-        });
+      const query = vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('count(*)')) {
+          countSql.push(sql);
+          return Promise.resolve({
+            rows: [{ total_count: '1', total_amount: '10' }],
+          });
+        }
+        pageSql.push(sql);
+        return Promise.resolve({ rows: [] });
+      });
       mockWithMerchantClient.mockImplementationOnce(
         async (_merchantId: number, fn: (client: unknown) => Promise<unknown>) => fn({ query }),
       );
 
-      const res = await GET(
-        mockRequest('http://localhost/api/payments?payer=GPAYER&limit=2'),
-      );
+      const res = await GET(mockRequest('http://localhost/api/payments?payer=GPAYER&limit=2'));
       expect(res.status).toBe(200);
       expect(countSql).toHaveLength(1);
       expect(pageSql).toHaveLength(1);
       expect(countSql[0]).toContain('payer = $2');
       expect(pageSql[0]).toContain('payer = $2');
-      const [, countParams] = query.mock.calls[0];
-      expect(countParams).toEqual([MERCHANT.id, 'GPAYER']);
+      const countCall = query.mock.calls.find(([sql]) => String(sql).includes('count(*)'));
+      expect(countCall?.[1]).toEqual([MERCHANT.id, 'GPAYER']);
     });
   });
 });

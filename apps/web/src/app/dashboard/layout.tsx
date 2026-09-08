@@ -29,9 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               The dashboard encountered an unexpected error. Your data is safe — this is a display
               issue, not a data issue.
             </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 font-mono">
-              {error.message}
-            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 font-mono">{error.message}</p>
             <button
               type="button"
               onClick={reset}

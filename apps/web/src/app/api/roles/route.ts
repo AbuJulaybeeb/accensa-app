@@ -2,18 +2,14 @@ import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import { withClient, withMerchantClient, ensureSchema } from '@/lib/db';
 import { getMerchantFromRequest } from '@/lib/merchants';
-import { zanzibarClient } from '@/lib/zanzibar/store';
-import { objectOf, RELATIONS } from '@/lib/zanzibar/schema';
+import { zanzibarClient, objectOf } from '@/lib/zanzibar/store';
+import { RELATIONS } from '@/lib/zanzibar/schema';
 import { authorize } from '@/lib/zanzibar/permissions';
 
 export const dynamic = 'force-dynamic';
 
 /** Fixed set of relations a merchant can grant on its own object. */
-const GRANTABLE_RELATIONS = new Set<string>([
-  RELATIONS.OWNER,
-  RELATIONS.EDITOR,
-  RELATIONS.VIEWER,
-]);
+const GRANTABLE_RELATIONS = new Set<string>([RELATIONS.OWNER, RELATIONS.EDITOR, RELATIONS.VIEWER]);
 
 function subjectFromRequest(request: NextRequest): string | null {
   return request.headers.get('x-accensa-sub');
@@ -89,7 +85,10 @@ export async function POST(request: NextRequest) {
   const { subject, relation } = body;
   const revoke = body.revoke === true;
 
-  if (typeof subject !== 'string' || !/^(user:[A-Za-z0-9_-]+|group:[A-Za-z0-9_-]+#member)$/.test(subject)) {
+  if (
+    typeof subject !== 'string' ||
+    !/^(user:[A-Za-z0-9_-]+|group:[A-Za-z0-9_-]+#member)$/.test(subject)
+  ) {
     return NextResponse.json(
       { error: 'subject must be "user:<id>" or "group:<id>#member"' },
       { status: 400 },

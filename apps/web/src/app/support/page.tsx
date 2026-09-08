@@ -21,8 +21,8 @@ export default function SupportPage() {
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
             Message our team through an end-to-end encrypted conversation. The session key is
-            derived from your Stellar wallet, so your messages are sealed before they ever touch
-            our servers.
+            derived from your Stellar wallet, so your messages are sealed before they ever touch our
+            servers.
           </p>
         </header>
         <SecureChat />
