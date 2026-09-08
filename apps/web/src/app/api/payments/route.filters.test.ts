@@ -12,9 +12,8 @@ import { GET } from './route';
  * filtered set, once, is the acceptance criterion for #167.
  */
 
-const MERCHANT = { id: 1, address: 'GABC' };
-
-const { mockWithClient, mockWithMerchantClient } = vi.hoisted(() => ({
+const { MERCHANT, mockWithClient, mockWithMerchantClient } = vi.hoisted(() => ({
+  MERCHANT: { id: 1, address: 'GABC' },
   mockWithClient: vi.fn(async (fn: (client: unknown) => Promise<unknown>) => fn({})),
   mockWithMerchantClient: vi.fn(),
 }));
@@ -59,7 +58,9 @@ function buildFixture(): FakeRow[] {
     for (let n = 0; n < 25; n++) {
       rows.push({
         merchant_id: MERCHANT.id,
-        tx_hash: `hash_${String(i).padStart(58, '0')}`,
+        // 64 hex chars so the cursor produced from a row passes the route's
+        // own isHash32 validation on the next page request.
+        tx_hash: String(i).padStart(64, '0'),
         payer: 'GPAYER',
         amount: '10.50',
         asset: 'XLM',
@@ -81,9 +82,7 @@ function filterRows(
   const scoped = table.filter((r) => r.merchant_id === MERCHANT.id);
   const filtered = filters.route ? scoped.filter((r) => r.route === filters.route) : scoped;
   const withPredicate = cursor
-    ? filtered.filter(
-        (r) => r.ts < cursor.ts || (r.ts === cursor.ts && r.tx_hash < cursor.txHash),
-      )
+    ? filtered.filter((r) => r.ts < cursor.ts || (r.ts === cursor.ts && r.tx_hash < cursor.txHash))
     : filtered;
   return withPredicate.sort((a, b) => {
     if (a.ts !== b.ts) return a.ts < b.ts ? 1 : -1;
@@ -111,12 +110,14 @@ function makeFakeDb(table: FakeRow[], filters: { route?: string }) {
       }
       const predicateIdx = sql.indexOf('AND (ts < $');
       let cursor: CursorState | null = null;
-      if (predicateIdx !== -1) {
-        // selectParams = [merchantId, ...filters, cursorTs, cursorTxHash, limit]
+      // Cursor requests end with [merchantId, ...filters, cursorTs, cursorTxHash,
+      // limit]; offset requests end with [merchantId, ...filters, limit, offset].
+      const isCursorQuery = predicateIdx !== -1;
+      if (isCursorQuery) {
         const cursorParams = params.slice(params.length - 3, params.length - 1);
         cursor = { ts: String(cursorParams[0]), txHash: String(cursorParams[1]) };
       }
-      const limit = Number(params[params.length - 1]);
+      const limit = Number(params[params.length - (isCursorQuery ? 1 : 2)]);
       const rows = filterRows(table, filters, cursor).slice(0, limit);
       return Promise.resolve({ rows });
     }),

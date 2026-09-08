@@ -1,26 +1,26 @@
 import { expect, test, vi, describe, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import { GET, POST } from './route';
 
-const { MERCHANT, mockWithClient, mockWithMerchantClient, mockGetMerchantFromRequest } =
-  vi.hoisted(() => {
+const { MERCHANT, mockWithClient, mockWithMerchantClient, mockGetMerchantFromRequest } = vi.hoisted(
+  () => {
     const merchant = { id: 1, address: 'GABC' };
     return {
       MERCHANT: merchant,
       mockWithClient: vi.fn(async (fn: (client: unknown) => Promise<unknown>) => fn({})),
-  mockWithMerchantClient: vi.fn(
-    async (_merchantId: number, fn: (client: unknown) => Promise<unknown>) =>
-      // The requesting merchant holds the owner relation, so view_dashboard
-      // (GET) and manage_team (POST) both authorize — mirroring a real
-      // seeding where the merchant that authenticated owns its store.
-      fn({
-        query: vi
-          .fn()
-          .mockResolvedValue({ rows: [{ relation: 'owner' }] }),
-      }),
-  ),
+      mockWithMerchantClient: vi.fn(
+        async (_merchantId: number, fn: (client: unknown) => Promise<unknown>) =>
+          // The requesting merchant holds the owner relation, so view_dashboard
+          // (GET) and manage_team (POST) both authorize — mirroring a real
+          // seeding where the merchant that authenticated owns its store.
+          fn({
+            query: vi.fn().mockResolvedValue({ rows: [{ relation: 'owner' }] }),
+          }),
+      ),
       mockGetMerchantFromRequest: vi.fn().mockResolvedValue(merchant),
     };
-  });
+  },
+);
 
 vi.mock('@/lib/db', () => ({
   withClient: mockWithClient,
@@ -32,11 +32,11 @@ vi.mock('@/lib/merchants', () => ({
   getMerchantFromRequest: mockGetMerchantFromRequest,
 }));
 
-function req(url = 'http://localhost/api/roles', init?: RequestInit): Request {
+function req(url = 'http://localhost/api/roles', init?: RequestInit): NextRequest {
   const headers = new Headers(init?.headers ?? {});
   if (!headers.has('x-accensa-sub')) headers.set('x-accensa-sub', 'GABC');
   if (!headers.has('x-accensa-merchant')) headers.set('x-accensa-merchant', 'GABC');
-  return new Request(url, { ...init, headers });
+  return new NextRequest(new Request(url, { ...init, headers }));
 }
 
 describe('/api/roles (#180)', () => {

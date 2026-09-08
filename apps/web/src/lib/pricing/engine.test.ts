@@ -51,8 +51,18 @@ describe('price() engine (#168)', () => {
 
   it('geo-tier rules match only their region', () => {
     const rules: PricingRule[] = [
-      { name: 'eu_pct', priority: 0, match: { geo: 'eu' }, effect: { kind: 'markup_pct', percent: '20' } },
-      { name: 'na_pct', priority: 0, match: { geo: 'na' }, effect: { kind: 'markup_pct', percent: '5' } },
+      {
+        name: 'eu_pct',
+        priority: 0,
+        match: { geo: 'eu' },
+        effect: { kind: 'markup_pct', percent: '20' },
+      },
+      {
+        name: 'na_pct',
+        priority: 0,
+        match: { geo: 'na' },
+        effect: { kind: 'markup_pct', percent: '5' },
+      },
     ];
     expect(price(rules, { merchant: 'GAAA', geo: 'eu' }, '100').total).toBe('120');
     expect(price(rules, { merchant: 'GAAA', geo: 'na' }, '100').total).toBe('105');

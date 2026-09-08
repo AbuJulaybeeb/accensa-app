@@ -55,7 +55,10 @@ export class SpiceDBClient implements ZanzibarClient {
       },
       body: JSON.stringify({
         consistency: { minimize_latency: true },
-        resource: { object_type: OBJECT_TYPES.MERCHANT, object_id: object.split('#')[0].split(':')[1] },
+        resource: {
+          object_type: OBJECT_TYPES.MERCHANT,
+          object_id: object.split('#')[0].split(':')[1],
+        },
         permission,
         subject: { object: { object_type: 'user', object_id: user.replace(/^user:/, '') } },
       }),
@@ -73,11 +76,23 @@ export class SpiceDBClient implements ZanzibarClient {
         'content-type': 'application/json',
         authorization: `Bearer ${this.token}`,
       },
-      body: JSON.stringify({ tuple_filter: { resource: { object_type: OBJECT_TYPES.MERCHANT, object_id: object.split(':')[1] } } }),
+      body: JSON.stringify({
+        tuple_filter: {
+          resource: { object_type: OBJECT_TYPES.MERCHANT, object_id: object.split(':')[1] },
+        },
+      }),
       cache: 'no-store',
     });
     if (!res.ok) throw new Error(`SpiceDB read failed: ${res.status}`);
-    const body = (await res.json()) as { relationship_tuples?: { relationship: { resource: { object_id: string }; relation: string; subject: { object?: { object_id: string }; userset?: { userset_id: string } } } }[] };
+    const body = (await res.json()) as {
+      relationship_tuples?: {
+        relationship: {
+          resource: { object_id: string };
+          relation: string;
+          subject: { object?: { object_id: string }; userset?: { userset_id: string } };
+        };
+      }[];
+    };
     return (body.relationship_tuples ?? []).map(({ relationship }) => {
       const subjectId = relationship.subject.object?.object_id ?? '';
       const userset = relationship.subject.userset?.userset_id
@@ -142,7 +157,11 @@ export class PostgresZanzibarStore implements ZanzibarClient {
       const relation = row.relation;
       if (relation === 'owner' || relation === 'admin') return true;
       if (permission === 'view_payments' || permission === 'view_dashboard') return true;
-      if ((permission === 'edit_merchant') && (relation === 'editor' || relation === 'owner' || relation === 'admin')) return true;
+      if (
+        permission === 'edit_merchant' &&
+        (relation === 'editor' || relation === 'owner' || relation === 'admin')
+      )
+        return true;
     }
     return false;
   }
@@ -163,9 +182,7 @@ export class PostgresZanzibarStore implements ZanzibarClient {
  * time; a cluster that has never been provisioned simply falls back to the
  * Postgres table.
  */
-export function zanzibarClient(
-  client: Client | null,
-): ZanzibarClient | null {
+export function zanzibarClient(client: Client | null): ZanzibarClient | null {
   if (!client) return null;
   const baseUrl = process.env.SPICEDB_API_URL;
   const token = process.env.SPICEDB_API_TOKEN ?? process.env.SPICEDB_PRESHARED_KEY ?? '';

@@ -146,7 +146,10 @@ export function SecureChat({ className = '' }: { className?: string }) {
             Secure Support Chat
           </h2>
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <Lock className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+            <Lock
+              className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400"
+              aria-hidden="true"
+            />
             End-to-end encrypted
           </p>
         </div>

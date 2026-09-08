@@ -275,11 +275,11 @@ merchant's role tuples (`view_dashboard` to read, `manage_team` to write).
 
 ### Env vars
 
-| Variable | Purpose |
-| --- | --- |
-| `SPICEDB_API_URL` | (optional) SpiceDB REST base URL; unset = local store |
-| `SPICEDB_API_TOKEN` | (optional) SpiceDB API token / preshared key |
-| `ACCENSA_ENFORCE_RBAC` | `1` to enforce `view_payments` on payment reads |
+| Variable               | Purpose                                               |
+| ---------------------- | ----------------------------------------------------- |
+| `SPICEDB_API_URL`      | (optional) SpiceDB REST base URL; unset = local store |
+| `SPICEDB_API_TOKEN`    | (optional) SpiceDB API token / preshared key          |
+| `ACCENSA_ENFORCE_RBAC` | `1` to enforce `view_payments` on payment reads       |
 
 ### Provisioning the cluster
 

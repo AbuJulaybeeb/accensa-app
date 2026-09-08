@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
-import { rateLimit } from '@/lib/rate-limit';
 import { parseRole, type Role } from '@/lib/rbac';
 
 /**
@@ -75,8 +74,6 @@ export async function middleware(request: NextRequest) {
       headers.set('x-accensa-merchant', merchantAddress ?? '');
       headers.set('x-accensa-role', role);
       return NextResponse.next({ request: { headers } });
-      await jwtVerify(sessionCookie, key, { algorithms: ['HS256'] });
-      return NextResponse.next();
     } catch {
       if (isPrivateApi) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       return NextResponse.redirect(new URL('/login', request.url));

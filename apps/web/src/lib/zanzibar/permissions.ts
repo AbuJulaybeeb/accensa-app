@@ -14,8 +14,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { withMerchantClient } from '@/lib/db';
-import { zanzibarClient } from './store';
-import { objectOf, permissionOf, type WildcardPermission } from './schema';
+import { zanzibarClient, objectOf } from './store';
+import { permissionOf, type WildcardPermission } from './schema';
 
 export type AuthzResult = NextResponse | null;
 
@@ -49,8 +49,7 @@ export async function authorize(
   if (!subject && opts.request) {
     const headers = opts.request.headers;
     subject =
-      headers.get('x-accensa-sub') ??
-      headers.get('authorization')?.replace(/^Bearer\s+/, '');
+      headers.get('x-accensa-sub') ?? headers.get('authorization')?.replace(/^Bearer\s+/, '');
   }
   if (!subject) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -64,10 +63,7 @@ export async function authorize(
   });
 
   if (!allowed) {
-    return NextResponse.json(
-      { error: `Permission denied: ${permissionName}` },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: `Permission denied: ${permissionName}` }, { status: 403 });
   }
   return null;
 }

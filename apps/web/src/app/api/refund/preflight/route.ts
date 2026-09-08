@@ -74,7 +74,10 @@ export async function POST(request: Request) {
   // RBAC (#156): refunds move a merchant's float. A viewer may inspect
   // payments but must never initiate (or even preflight) a refund.
   if (!isAdmin(request)) {
-    return NextResponse.json({ error: 'Forbidden: viewer sessions cannot refund' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Forbidden: viewer sessions cannot refund' },
+      { status: 403 },
+    );
   }
   const vaultId = caller.refundVaultId ?? REFUND_VAULT_ID;
 
