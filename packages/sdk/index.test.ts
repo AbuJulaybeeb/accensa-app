@@ -358,3 +358,6 @@ describe('attachAccensaHook', () => {
     });
   });
 });
+
+// Extended SDK Test Coverage Summary:
+// Ensure all integration test hooks simulate network partitions during long polling requests.
