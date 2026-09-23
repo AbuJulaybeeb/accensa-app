@@ -35,7 +35,10 @@ function measure({ treeshake, minify }) {
   tmpConfigs.push(configPath);
   const core = `format:['esm','cjs'],dts:true,outDir:'dist',splitting:false,sourcemap:false,target:'node18',treeshake:${treeshake},minify:${minify}`;
   const config = `import { defineConfig } from 'tsup';\nexport default defineConfig([\n{ entry:['index.ts'], ${core}, clean:true },\n{ entry:{ merkle:'merkle.ts' }, ${core} }\n]);\n`;
-  execFileSync(process.execPath, ['-e', `require('fs').writeFileSync(${JSON.stringify(configPath)}, ${JSON.stringify(config)})`]);
+  execFileSync(process.execPath, [
+    '-e',
+    `require('fs').writeFileSync(${JSON.stringify(configPath)}, ${JSON.stringify(config)})`,
+  ]);
 
   rmSync(distDir, { recursive: true, force: true });
   const start = performance.now();
