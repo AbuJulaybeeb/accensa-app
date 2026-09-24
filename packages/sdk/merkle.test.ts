@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
-import { verifyReceipt, buildBatch, receiptLeaf, HashDecodeError, EmptyBatchError, MerkleError } from './merkle';
+import {
+  verifyReceipt,
+  buildBatch,
+  receiptLeaf,
+  HashDecodeError,
+  EmptyBatchError,
+  MerkleError,
+} from './merkle';
 import vectors from './merkle-vectors.json';
 
 const sha256 = (buf: Buffer) => createHash('sha256').update(buf).digest();
